@@ -1,0 +1,6 @@
+{
+  "name": "My Mate",
+  "description": "An ultra-private, end-to-end encrypted 2-user messenger with real-time chats, media sharing, ephemeral 24h status updates, and WebRTC voice & video calling.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

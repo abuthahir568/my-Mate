@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">My Mate</string>
+    <string name="tagline_sanctuary">Strict 2-User End-to-End Encrypted Sanctuary</string>
+    <string name="sign_in_google">Continue with Google (Gmail)</string>
+    <string name="verify_mobile_number">Send SMS Verification Code</string>
+    <string name="verify_otp_button">Verify OTP &amp; Enter Vault</string>
+    <string name="tab_chats">Chats</string>
+    <string name="tab_status">Status</string>
+    <string name="tab_calls">Calls</string>
+    <string name="e2ee_banner">Messages, photos, 24h stories &amp; calls are end-to-end encrypted with AES-256-GCM. Strictly locked to 2 users.</string>
+    <string name="create_vault_title">Create 2-User Vault</string>
+    <string name="join_vault_title">Join Partner\'s Vault</string>
+    <string name="status_limit_notice">Max 30s duration • Auto-deletes in 24 hours</string>
+    <string name="call_audio">Voice Call</string>
+    <string name="call_video">Video Call</string>
+    <string name="type_message_hint">Message your mate…</string>
+    <string name="attach_photo_edit_hd">Edit &amp; Send Photo (HD)</string>
+    <string name="attach_gif">Send Animated GIF</string>
+    <string name="attach_hd_video">Send HD Video</string>
+    <string name="hd_quality_badge">HD</string>
+    <string name="gif_badge">GIF</string>
+    <string name="editor_add_caption_hint">Add an encrypted caption…</string>
+    <string name="uploading_encrypted_media">Encrypting &amp; sending HD media…</string>
+</resources>
+

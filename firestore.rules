@@ -1,0 +1,380 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- PRIMITIVE HELPERS ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidBoundedMemberList(listData) {
+      return listData is list &&
+             listData.size() >= 1 &&
+             listData.size() <= 2 &&
+             listData[0] is string &&
+             listData[0].size() <= 128 &&
+             (listData.size() == 1 || (listData[1] is string && listData[1].size() <= 128));
+    }
+
+    // --- ENTITY VALIDATION BLUEPRINTS ---
+
+    function isValidVault(data) {
+      return data.pairingCodeHash is string && data.pairingCodeHash.size() >= 16 && data.pairingCodeHash.size() <= 128 &&
+             data.user1Uid is string && data.user1Uid.size() >= 1 && data.user1Uid.size() <= 128 &&
+             data.user1Name is string && data.user1Name.size() >= 1 && data.user1Name.size() <= 80 &&
+             (!('user1Photo' in data) || data.user1Photo == null || (data.user1Photo is string && data.user1Photo.size() <= 500)) &&
+             data.user2Uid is string && data.user2Uid.size() <= 128 &&
+             data.user2Name is string && data.user2Name.size() <= 80 &&
+             (!('user2Photo' in data) || data.user2Photo == null || (data.user2Photo is string && data.user2Photo.size() <= 500)) &&
+             isValidBoundedMemberList(data.memberUids) &&
+             data.status in ['waiting', 'locked'] &&
+             data.user1Typing is bool &&
+             data.user2Typing is bool &&
+             data.user1Online is bool &&
+             data.user2Online is bool &&
+             (!('lastMessagePreview' in data) || data.lastMessagePreview == null || (data.lastMessagePreview is string && data.lastMessagePreview.size() <= 2000)) &&
+             (!('lastMessageIv' in data) || data.lastMessageIv == null || (data.lastMessageIv is string && data.lastMessageIv.size() <= 128)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidChatMessage(data) {
+      return data.vaultId is string && data.vaultId.size() >= 1 && data.vaultId.size() <= 128 &&
+             data.senderUid is string && data.senderUid.size() >= 1 && data.senderUid.size() <= 128 &&
+             data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 80 &&
+             isValidBoundedMemberList(data.memberUids) &&
+             data.messageType in ['text', 'image', 'gif', 'video'] &&
+             data.cipherText is string && data.cipherText.size() >= 1 && data.cipherText.size() <= 20000 &&
+             data.iv is string && data.iv.size() >= 8 && data.iv.size() <= 128 &&
+             (!('mediaCipherText' in data) || data.mediaCipherText == null || (data.mediaCipherText is string && data.mediaCipherText.size() <= 750000)) &&
+             (!('mediaIv' in data) || data.mediaIv == null || (data.mediaIv is string && data.mediaIv.size() <= 128)) &&
+             (!('isHd' in data) || data.isHd == null || data.isHd is bool) &&
+             (!('mediaGroupId' in data) || data.mediaGroupId == null || (data.mediaGroupId is string && data.mediaGroupId.size() <= 128)) &&
+             (!('totalChunks' in data) || data.totalChunks == null || (data.totalChunks is int && data.totalChunks >= 1 && data.totalChunks <= 32)) &&
+             (!('mediaDurationMs' in data) || data.mediaDurationMs == null || (data.mediaDurationMs is int && data.mediaDurationMs >= 0 && data.mediaDurationMs <= 3600000)) &&
+             (!('replyToId' in data) || data.replyToId == null || (data.replyToId is string && data.replyToId.size() <= 128)) &&
+             (!('replyPreviewCipher' in data) || data.replyPreviewCipher == null || (data.replyPreviewCipher is string && data.replyPreviewCipher.size() <= 2000)) &&
+             data.status in ['sent', 'delivered', 'read'] &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidMediaChunk(data) {
+      return data.vaultId is string && data.vaultId.size() >= 1 && data.vaultId.size() <= 128 &&
+             data.mediaGroupId is string && data.mediaGroupId.size() >= 1 && data.mediaGroupId.size() <= 128 &&
+             data.senderUid is string && data.senderUid.size() >= 1 && data.senderUid.size() <= 128 &&
+             isValidBoundedMemberList(data.memberUids) &&
+             data.chunkIndex is int && data.chunkIndex >= 0 && data.chunkIndex < 32 &&
+             data.totalChunks is int && data.totalChunks >= 1 && data.totalChunks <= 32 &&
+             data.chunkIndex < data.totalChunks &&
+             data.cipherChunk is string && data.cipherChunk.size() >= 1 && data.cipherChunk.size() <= 750000 &&
+             data.iv is string && data.iv.size() >= 8 && data.iv.size() <= 128 &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    function isValidStatusStory(data) {
+      return data.vaultId is string && data.vaultId.size() >= 1 && data.vaultId.size() <= 128 &&
+             data.authorUid is string && data.authorUid.size() >= 1 && data.authorUid.size() <= 128 &&
+             data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80 &&
+             isValidBoundedMemberList(data.memberUids) &&
+             data.mediaType in ['photo', 'video_clip', 'text_card'] &&
+             data.captionCipher is string && data.captionCipher.size() <= 5000 &&
+             data.captionIv is string && data.captionIv.size() >= 8 && data.captionIv.size() <= 128 &&
+             (!('mediaCipher' in data) || data.mediaCipher == null || (data.mediaCipher is string && data.mediaCipher.size() <= 450000)) &&
+             (!('mediaIv' in data) || data.mediaIv == null || (data.mediaIv is string && data.mediaIv.size() <= 128)) &&
+             data.backgroundHex is string && data.backgroundHex.size() >= 4 && data.backgroundHex.size() <= 16 &&
+             data.durationSeconds is int && data.durationSeconds >= 1 && data.durationSeconds <= 30 &&
+             data.expiresAtMillis is int && data.expiresAtMillis > 0 &&
+             data.viewedByUids is list && data.viewedByUids.size() <= 2 &&
+             (data.viewedByUids.size() == 0 || (data.viewedByUids[0] is string && data.viewedByUids[0].size() <= 128)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidCallSession(data) {
+      return data.vaultId is string && data.vaultId.size() >= 1 && data.vaultId.size() <= 128 &&
+             data.callerUid is string && data.callerUid.size() >= 1 && data.callerUid.size() <= 128 &&
+             data.callerName is string && data.callerName.size() >= 1 && data.callerName.size() <= 80 &&
+             data.calleeUid is string && data.calleeUid.size() <= 128 &&
+             data.calleeName is string && data.calleeName.size() <= 80 &&
+             isValidBoundedMemberList(data.memberUids) &&
+             data.callType in ['audio', 'video'] &&
+             data.state in ['ringing', 'connected', 'ended', 'declined', 'missed'] &&
+             (!('sdpOffer' in data) || data.sdpOffer == null || (data.sdpOffer is string && data.sdpOffer.size() <= 30000)) &&
+             (!('sdpAnswer' in data) || data.sdpAnswer == null || (data.sdpAnswer is string && data.sdpAnswer.size() <= 30000)) &&
+             (!('callerCandidatesJson' in data) || data.callerCandidatesJson == null || (data.callerCandidatesJson is string && data.callerCandidatesJson.size() <= 30000)) &&
+             (!('calleeCandidatesJson' in data) || data.calleeCandidatesJson == null || (data.calleeCandidatesJson is string && data.calleeCandidatesJson.size() <= 30000)) &&
+             data.durationSeconds is int && data.durationSeconds >= 0 && data.durationSeconds <= 86400 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isParentVaultMember(vaultId) {
+      let vault = get(/databases/$(database)/documents/vaults/$(vaultId)).data;
+      return request.auth.uid == vault.user1Uid || (vault.user2Uid != '' && request.auth.uid == vault.user2Uid);
+    }
+
+    // --- COLLECTION: /vaults/{vaultId} ---
+    match /vaults/{vaultId} {
+      // Paired members can get their vault; a 2nd mate who knows the exact cryptographic vaultId
+      // derived from the 1-time secret code can get ONLY while status == 'waiting' in order to claim Slot 2.
+      // Once locked, NO 3rd user can even read the vault document!
+      allow get: if isSignedIn() && isValidId(vaultId) && (
+        request.auth.uid in existing().memberUids ||
+        (existing().status == 'waiting' && existing().user2Uid == '')
+      );
+
+      // List queries strictly require membership filter (whereArrayContains("memberUids", uid))
+      allow list: if isSignedIn() && request.auth.uid in existing().memberUids;
+
+      // CREATE: User 1 initializes a 2-seat vault in 'waiting' state
+      allow create: if isSignedIn() &&
+                       isValidId(vaultId) &&
+                       incoming().keys().hasAll([
+                         'pairingCodeHash', 'user1Uid', 'user1Name', 'user2Uid', 'user2Name',
+                         'memberUids', 'status', 'user1Typing', 'user2Typing',
+                         'user1Online', 'user2Online', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'pairingCodeHash', 'user1Uid', 'user1Name', 'user1Photo',
+                         'user2Uid', 'user2Name', 'user2Photo', 'memberUids', 'status',
+                         'user1Typing', 'user2Typing', 'user1Online', 'user2Online',
+                         'lastMessagePreview', 'lastMessageIv', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().user1Uid == request.auth.uid &&
+                       incoming().user2Uid == '' &&
+                       incoming().status == 'waiting' &&
+                       incoming().memberUids.size() == 1 &&
+                       incoming().memberUids[0] == request.auth.uid &&
+                       isValidVault(incoming());
+
+      // UPDATE: Action-based updates wrapped in isValidVault(incoming())
+      allow update: if isSignedIn() &&
+                       isValidId(vaultId) &&
+                       isValidVault(incoming()) &&
+                       incoming().user1Uid == existing().user1Uid &&
+                       incoming().pairingCodeHash == existing().pairingCodeHash &&
+                       incoming().createdAt == existing().createdAt && (
+                         // Action 1: Second mate claims Slot 2 and permanently locks the vault
+                         (existing().status == 'waiting' &&
+                          existing().user2Uid == '' &&
+                          request.auth.uid != existing().user1Uid &&
+                          incoming().user2Uid == request.auth.uid &&
+                          incoming().status == 'locked' &&
+                          incoming().memberUids.size() == 2 &&
+                          incoming().memberUids[0] == existing().user1Uid &&
+                          incoming().memberUids[1] == request.auth.uid &&
+                          incoming().diff(existing()).affectedKeys().hasOnly([
+                            'user2Uid', 'user2Name', 'user2Photo', 'memberUids',
+                            'status', 'user2Online', 'updatedAt'
+                          ])) ||
+                         // Action 2: Paired member updates presence, typing indicator, or last message preview
+                         (request.auth.uid in existing().memberUids &&
+                          incoming().user2Uid == existing().user2Uid &&
+                          incoming().status == existing().status &&
+                          incoming().memberUids == existing().memberUids &&
+                          incoming().diff(existing()).affectedKeys().hasOnly([
+                            'user1Name', 'user1Photo', 'user2Name', 'user2Photo',
+                            'user1Typing', 'user2Typing', 'user1Online', 'user2Online',
+                            'lastMessagePreview', 'lastMessageIv', 'updatedAt'
+                          ]))
+                       );
+
+      allow delete: if false;
+
+      // --- SUBCOLLECTION: /vaults/{vaultId}/messages/{messageId} ---
+      match /messages/{messageId} {
+        allow get: if isSignedIn() && isValidId(vaultId) && isValidId(messageId) &&
+                      request.auth.uid in existing().memberUids;
+        allow list: if isSignedIn() && request.auth.uid in existing().memberUids;
+
+        allow create: if isSignedIn() &&
+                         isValidId(vaultId) &&
+                         isValidId(messageId) &&
+                         incoming().keys().hasAll([
+                           'vaultId', 'senderUid', 'senderName', 'memberUids',
+                           'messageType', 'cipherText', 'iv', 'status', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'vaultId', 'senderUid', 'senderName', 'memberUids',
+                           'messageType', 'cipherText', 'iv', 'mediaCipherText', 'mediaIv',
+                           'isHd', 'mediaGroupId', 'totalChunks', 'mediaDurationMs',
+                           'replyToId', 'replyPreviewCipher', 'status', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().vaultId == vaultId &&
+                         incoming().senderUid == request.auth.uid &&
+                         request.auth.uid in incoming().memberUids &&
+                         isValidChatMessage(incoming()) &&
+                         isParentVaultMember(vaultId);
+
+        allow update: if isSignedIn() &&
+                         isValidId(vaultId) &&
+                         isValidId(messageId) &&
+                         isValidChatMessage(incoming()) &&
+                         request.auth.uid in existing().memberUids &&
+                         incoming().vaultId == existing().vaultId &&
+                         incoming().senderUid == existing().senderUid &&
+                         incoming().memberUids == existing().memberUids &&
+                         incoming().cipherText == existing().cipherText &&
+                         incoming().iv == existing().iv &&
+                         incoming().createdAt == existing().createdAt && (
+                           // Action: Update delivery/read receipt status
+                           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+                         );
+
+        allow delete: if isSignedIn() &&
+                         isValidId(vaultId) &&
+                         isValidId(messageId) &&
+                         existing().senderUid == request.auth.uid;
+      }
+
+      // --- SUBCOLLECTION: /vaults/{vaultId}/media_chunks/{chunkId} ---
+      match /media_chunks/{chunkId} {
+        allow get: if isSignedIn() && isValidId(vaultId) && isValidId(chunkId) &&
+                      request.auth.uid in existing().memberUids;
+        allow list: if isSignedIn() && request.auth.uid in existing().memberUids;
+
+        allow create: if isSignedIn() &&
+                         isValidId(vaultId) &&
+                         isValidId(chunkId) &&
+                         incoming().keys().hasAll([
+                           'vaultId', 'mediaGroupId', 'senderUid', 'memberUids',
+                           'chunkIndex', 'totalChunks', 'cipherChunk', 'iv', 'createdAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'vaultId', 'mediaGroupId', 'senderUid', 'memberUids',
+                           'chunkIndex', 'totalChunks', 'cipherChunk', 'iv', 'createdAt'
+                         ]) &&
+                         incoming().vaultId == vaultId &&
+                         incoming().senderUid == request.auth.uid &&
+                         request.auth.uid in incoming().memberUids &&
+                         isValidMediaChunk(incoming()) &&
+                         isParentVaultMember(vaultId);
+
+        allow update: if false;
+
+        allow delete: if isSignedIn() &&
+                         isValidId(vaultId) &&
+                         isValidId(chunkId) &&
+                         existing().senderUid == request.auth.uid;
+      }
+
+      // --- SUBCOLLECTION: /vaults/{vaultId}/statuses/{statusId} ---
+      match /statuses/{statusId} {
+        allow get: if isSignedIn() && isValidId(vaultId) && isValidId(statusId) &&
+                      request.auth.uid in existing().memberUids;
+        allow list: if isSignedIn() && request.auth.uid in existing().memberUids;
+
+        allow create: if isSignedIn() &&
+                         isValidId(vaultId) &&
+                         isValidId(statusId) &&
+                         incoming().keys().hasAll([
+                           'vaultId', 'authorUid', 'authorName', 'memberUids',
+                           'mediaType', 'captionCipher', 'captionIv', 'backgroundHex',
+                           'durationSeconds', 'expiresAtMillis', 'viewedByUids',
+                           'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'vaultId', 'authorUid', 'authorName', 'memberUids',
+                           'mediaType', 'captionCipher', 'captionIv', 'mediaCipher', 'mediaIv',
+                           'backgroundHex', 'durationSeconds', 'expiresAtMillis',
+                           'viewedByUids', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().vaultId == vaultId &&
+                         incoming().authorUid == request.auth.uid &&
+                         request.auth.uid in incoming().memberUids &&
+                         isValidStatusStory(incoming()) &&
+                         isParentVaultMember(vaultId);
+
+        allow update: if isSignedIn() &&
+                         isValidId(vaultId) &&
+                         isValidId(statusId) &&
+                         isValidStatusStory(incoming()) &&
+                         request.auth.uid in existing().memberUids &&
+                         incoming().vaultId == existing().vaultId &&
+                         incoming().authorUid == existing().authorUid &&
+                         incoming().memberUids == existing().memberUids &&
+                         incoming().durationSeconds == existing().durationSeconds &&
+                         incoming().expiresAtMillis == existing().expiresAtMillis &&
+                         incoming().createdAt == existing().createdAt && (
+                           // Action: Mark story viewed by mate
+                           incoming().diff(existing()).affectedKeys().hasOnly(['viewedByUids', 'updatedAt'])
+                         );
+
+        // Either author or mate can trigger auto-delete of expired stories, or author can delete anytime
+        allow delete: if isSignedIn() &&
+                         isValidId(vaultId) &&
+                         isValidId(statusId) &&
+                         request.auth.uid in existing().memberUids;
+      }
+
+      // --- SUBCOLLECTION: /vaults/{vaultId}/calls/{callId} ---
+      match /calls/{callId} {
+        allow get: if isSignedIn() && isValidId(vaultId) && isValidId(callId) &&
+                      request.auth.uid in existing().memberUids;
+        allow list: if isSignedIn() && request.auth.uid in existing().memberUids;
+
+        allow create: if isSignedIn() &&
+                         isValidId(vaultId) &&
+                         isValidId(callId) &&
+                         incoming().keys().hasAll([
+                           'vaultId', 'callerUid', 'callerName', 'calleeUid', 'calleeName',
+                           'memberUids', 'callType', 'state', 'durationSeconds',
+                           'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'vaultId', 'callerUid', 'callerName', 'calleeUid', 'calleeName',
+                           'memberUids', 'callType', 'state', 'sdpOffer', 'sdpAnswer',
+                           'callerCandidatesJson', 'calleeCandidatesJson',
+                           'durationSeconds', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().vaultId == vaultId &&
+                         incoming().callerUid == request.auth.uid &&
+                         incoming().state == 'ringing' &&
+                         request.auth.uid in incoming().memberUids &&
+                         isValidCallSession(incoming()) &&
+                         isParentVaultMember(vaultId);
+
+        allow update: if isSignedIn() &&
+                         isValidId(vaultId) &&
+                         isValidId(callId) &&
+                         isValidCallSession(incoming()) &&
+                         request.auth.uid in existing().memberUids &&
+                         !(existing().state in ['ended', 'declined', 'missed']) &&
+                         incoming().vaultId == existing().vaultId &&
+                         incoming().callerUid == existing().callerUid &&
+                         incoming().calleeUid == existing().calleeUid &&
+                         incoming().memberUids == existing().memberUids &&
+                         incoming().callType == existing().callType &&
+                         incoming().createdAt == existing().createdAt && (
+                           // Action: WebRTC Signaling (Answer, ICE Candidates, State transition, Duration)
+                           incoming().diff(existing()).affectedKeys().hasOnly([
+                             'state', 'sdpOffer', 'sdpAnswer',
+                             'callerCandidatesJson', 'calleeCandidatesJson',
+                             'durationSeconds', 'updatedAt'
+                           ])
+                         );
+
+        allow delete: if false;
+      }
+    }
+  }
+}

@@ -1,0 +1,438 @@
+{
+  "entities": {
+    "Vault": {
+      "title": "Vault",
+      "description": "Strict 2-user private encrypted workspace pairing exactly two authenticated users.",
+      "type": "object",
+      "properties": {
+        "pairingCodeHash": {
+          "type": "string",
+          "description": "SHA-256 hex digest of the one-time pairing code & E2EE key salt."
+        },
+        "user1Uid": {
+          "type": "string",
+          "description": "UID of the first mate who created the vault."
+        },
+        "user1Name": {
+          "type": "string",
+          "description": "Display name of user 1."
+        },
+        "user1Photo": {
+          "type": "string",
+          "description": "Avatar URL of user 1."
+        },
+        "user2Uid": {
+          "type": "string",
+          "description": "UID of the second mate (empty string until claimed, then immutable)."
+        },
+        "user2Name": {
+          "type": "string",
+          "description": "Display name of user 2."
+        },
+        "user2Photo": {
+          "type": "string",
+          "description": "Avatar URL of user 2."
+        },
+        "memberUids": {
+          "type": "array",
+          "description": "Bounded list (size 1 or 2) of paired UIDs for secure query alignment."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["waiting", "locked"],
+          "description": "Vault state: 'waiting' for 2nd mate, or 'locked' permanently to the 2 mates."
+        },
+        "user1Typing": {
+          "type": "boolean",
+          "description": "Real-time typing indicator for user 1."
+        },
+        "user2Typing": {
+          "type": "boolean",
+          "description": "Real-time typing indicator for user 2."
+        },
+        "user1Online": {
+          "type": "boolean",
+          "description": "Online presence indicator for user 1."
+        },
+        "user2Online": {
+          "type": "boolean",
+          "description": "Online presence indicator for user 2."
+        },
+        "lastMessagePreview": {
+          "type": "string",
+          "description": "Encrypted preview ciphertext of the latest message."
+        },
+        "lastMessageIv": {
+          "type": "string",
+          "description": "Base64 IV for decrypting lastMessagePreview."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "pairingCodeHash",
+        "user1Uid",
+        "user1Name",
+        "user2Uid",
+        "user2Name",
+        "memberUids",
+        "status",
+        "user1Typing",
+        "user2Typing",
+        "user1Online",
+        "user2Online",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "End-to-end encrypted real-time chat message or photo share between the 2 mates.",
+      "type": "object",
+      "properties": {
+        "vaultId": {
+          "type": "string",
+          "description": "Parent vault ID."
+        },
+        "senderUid": {
+          "type": "string",
+          "description": "UID of the sender."
+        },
+        "senderName": {
+          "type": "string",
+          "description": "Display name of the sender."
+        },
+        "memberUids": {
+          "type": "array",
+          "description": "Bounded 1-2 UID list of authorized vault mates."
+        },
+        "messageType": {
+          "type": "string",
+          "enum": ["text", "image", "gif", "video"],
+          "description": "Payload kind: text, edited/HD image, animated GIF, or HD video."
+        },
+        "cipherText": {
+          "type": "string",
+          "description": "AES-256-GCM Base64 encrypted text content or caption."
+        },
+        "iv": {
+          "type": "string",
+          "description": "AES-256-GCM Base64 initialization vector."
+        },
+        "mediaCipherText": {
+          "type": "string",
+          "description": "Optional AES-256-GCM Base64 encrypted inline photo/GIF or video poster thumbnail."
+        },
+        "mediaIv": {
+          "type": "string",
+          "description": "Optional Base64 IV for mediaCipherText."
+        },
+        "isHd": {
+          "type": "boolean",
+          "description": "Optional flag indicating HD quality photo or HD video."
+        },
+        "mediaGroupId": {
+          "type": "string",
+          "description": "Optional group ID pointing to encrypted binary chunks in media_chunks."
+        },
+        "totalChunks": {
+          "type": "integer",
+          "description": "Optional count of encrypted binary chunks (1..32) in media_chunks."
+        },
+        "mediaDurationMs": {
+          "type": "integer",
+          "description": "Optional duration in milliseconds for video messages."
+        },
+        "replyToId": {
+          "type": "string",
+          "description": "Optional ID of message being replied to."
+        },
+        "replyPreviewCipher": {
+          "type": "string",
+          "description": "Optional encrypted snippet of replied message."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["sent", "delivered", "read"],
+          "description": "Delivery & read receipt status (blue ticks when 'read')."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "vaultId",
+        "senderUid",
+        "senderName",
+        "memberUids",
+        "messageType",
+        "cipherText",
+        "iv",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StatusStory": {
+      "title": "StatusStory",
+      "description": "Ephemeral 24-hour encrypted photo/video story capped strictly at 30 seconds duration.",
+      "type": "object",
+      "properties": {
+        "vaultId": {
+          "type": "string",
+          "description": "Parent vault ID."
+        },
+        "authorUid": {
+          "type": "string",
+          "description": "UID of the mate posting the status."
+        },
+        "authorName": {
+          "type": "string",
+          "description": "Display name of the author."
+        },
+        "memberUids": {
+          "type": "array",
+          "description": "Bounded 1-2 UID list of authorized vault mates."
+        },
+        "mediaType": {
+          "type": "string",
+          "enum": ["photo", "video_clip", "text_card"],
+          "description": "Type of story status."
+        },
+        "captionCipher": {
+          "type": "string",
+          "description": "AES-256-GCM encrypted story caption or text."
+        },
+        "captionIv": {
+          "type": "string",
+          "description": "Base64 IV for captionCipher."
+        },
+        "mediaCipher": {
+          "type": "string",
+          "description": "Optional AES-256-GCM encrypted image/poster frame."
+        },
+        "mediaIv": {
+          "type": "string",
+          "description": "Optional Base64 IV for mediaCipher."
+        },
+        "backgroundHex": {
+          "type": "string",
+          "description": "Hex color string for status background."
+        },
+        "durationSeconds": {
+          "type": "integer",
+          "description": "Display duration in seconds, strictly 1..30."
+        },
+        "expiresAtMillis": {
+          "type": "integer",
+          "description": "Epoch milliseconds 24 hours after creation for auto-deletion."
+        },
+        "viewedByUids": {
+          "type": "array",
+          "description": "Bounded list of UIDs who viewed this story."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "vaultId",
+        "authorUid",
+        "authorName",
+        "memberUids",
+        "mediaType",
+        "captionCipher",
+        "captionIv",
+        "backgroundHex",
+        "durationSeconds",
+        "expiresAtMillis",
+        "viewedByUids",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CallSession": {
+      "title": "CallSession",
+      "description": "WebRTC real-time voice/video call signaling session and call log between the 2 mates.",
+      "type": "object",
+      "properties": {
+        "vaultId": {
+          "type": "string",
+          "description": "Parent vault ID."
+        },
+        "callerUid": {
+          "type": "string",
+          "description": "UID of the mate initiating the call."
+        },
+        "callerName": {
+          "type": "string",
+          "description": "Display name of caller."
+        },
+        "calleeUid": {
+          "type": "string",
+          "description": "UID of the receiving mate."
+        },
+        "calleeName": {
+          "type": "string",
+          "description": "Display name of callee."
+        },
+        "memberUids": {
+          "type": "array",
+          "description": "Bounded 1-2 UID list of authorized vault mates."
+        },
+        "callType": {
+          "type": "string",
+          "enum": ["audio", "video"],
+          "description": "Voice or Video call."
+        },
+        "state": {
+          "type": "string",
+          "enum": ["ringing", "connected", "ended", "declined", "missed"],
+          "description": "Call signaling lifecycle state."
+        },
+        "sdpOffer": {
+          "type": "string",
+          "description": "Encrypted WebRTC SDP Offer payload."
+        },
+        "sdpAnswer": {
+          "type": "string",
+          "description": "Encrypted WebRTC SDP Answer payload."
+        },
+        "callerCandidatesJson": {
+          "type": "string",
+          "description": "Encrypted ICE candidates from caller."
+        },
+        "calleeCandidatesJson": {
+          "type": "string",
+          "description": "Encrypted ICE candidates from callee."
+        },
+        "durationSeconds": {
+          "type": "integer",
+          "description": "Call duration in seconds upon completion."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "vaultId",
+        "callerUid",
+        "callerName",
+        "calleeUid",
+        "calleeName",
+        "memberUids",
+        "callType",
+        "state",
+        "durationSeconds",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MediaChunk": {
+      "title": "MediaChunk",
+      "description": "Immutable AES-256-GCM encrypted binary chunk for HD photos, animated GIFs, and HD videos between the 2 mates.",
+      "type": "object",
+      "properties": {
+        "vaultId": {
+          "type": "string",
+          "description": "Parent vault ID."
+        },
+        "mediaGroupId": {
+          "type": "string",
+          "description": "Shared identifier grouping ordered binary chunks of an HD media file."
+        },
+        "senderUid": {
+          "type": "string",
+          "description": "UID of the sender who uploaded the encrypted media."
+        },
+        "memberUids": {
+          "type": "array",
+          "description": "Bounded 1-2 UID list of authorized vault mates."
+        },
+        "chunkIndex": {
+          "type": "integer",
+          "description": "Zero-based index of this binary chunk (0..31)."
+        },
+        "totalChunks": {
+          "type": "integer",
+          "description": "Total number of chunks in this encrypted media stream (1..32)."
+        },
+        "cipherChunk": {
+          "type": "string",
+          "description": "AES-256-GCM Base64 encrypted binary slice."
+        },
+        "iv": {
+          "type": "string",
+          "description": "AES-256-GCM Base64 initialization vector for this chunk."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "vaultId",
+        "mediaGroupId",
+        "senderUid",
+        "memberUids",
+        "chunkIndex",
+        "totalChunks",
+        "cipherChunk",
+        "iv",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/vaults/{vaultId}": {
+      "schema": "Vault",
+      "description": "Top-level 2-user vaults locked permanently to user1Uid and user2Uid."
+    },
+    "/vaults/{vaultId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "End-to-end encrypted real-time messages, HD photos, GIFs, and HD videos within a vault."
+    },
+    "/vaults/{vaultId}/media_chunks/{chunkId}": {
+      "schema": "MediaChunk",
+      "description": "End-to-end encrypted binary chunks for high-definition images, GIFs, and HD videos."
+    },
+    "/vaults/{vaultId}/statuses/{statusId}": {
+      "schema": "StatusStory",
+      "description": "Ephemeral 24-hour encrypted stories (max 30 seconds) within a vault."
+    },
+    "/vaults/{vaultId}/calls/{callId}": {
+      "schema": "CallSession",
+      "description": "WebRTC call signaling sessions and call history within a vault."
+    }
+  }
+}
